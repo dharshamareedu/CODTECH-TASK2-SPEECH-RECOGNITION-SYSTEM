@@ -1,0 +1,42 @@
+import speech_recognition as sr
+from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
+import torch
+import librosa
+import numpy as np
+
+def recognize_speech_google(audio_file):
+    """Recognizes speech from an audio file using Google's Speech Recognition API."""
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(audio_file) as source:
+        audio = recognizer.record(source)
+    
+    try:
+        text = recognizer.recognize_google(audio)
+        return text
+    except sr.UnknownValueError:
+        return "Speech not understood."
+    except sr.RequestError:
+        return "Error connecting to recognition service."
+
+def recognize_speech_wav2vec(audio_file):
+    """Recognizes speech from an audio file using Wav2Vec2."""
+    processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
+    model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base-960h")
+    
+    audio, rate = librosa.load(audio_file, sr=16000)
+    input_values = processor(audio, return_tensors="pt", sampling_rate=16000).input_values
+    with torch.no_grad():
+        logits = model(input_values).logits
+    
+    predicted_ids = torch.argmax(logits, dim=-1)
+    transcription = processor.batch_decode(predicted_ids)[0]
+    return transcription
+
+if __name__ == "__main__":
+    audio_path = "sample.wav"  # Replace with the actual path to your audio file
+    
+    print("Transcription using Google Speech Recognition:")
+    print(recognize_speech_google(audio_path))
+    
+    print("\nTranscription using Wav2Vec2:")
+    print(recognize_speech_wav2vec(audio_path))
